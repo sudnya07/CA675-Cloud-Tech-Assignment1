@@ -1,0 +1,86 @@
+#creating tabel in Hive 
+CREATE TABLE IF NOT EXISTS sudnya007 
+(Postid int,
+PostScores int,
+Count int,
+Stuc string, 
+UserId int,
+UserName string,
+Postscript string, 
+Label string)
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde';
+
+
+#Creating view in Hive 
+CREATE view IF NOT EXISTS Sudnyaview007 as select
+Cast (Postid as int) as Postid,
+Cast (PostScores as int) as PostScores,
+Cast(Count as int) as Count,
+Stuc , 
+Cast (UserId as int) as UserId, 
+UserName,
+Postscript , 
+Label  from sudnya007;
+
+
+#loading data in Hive 
+LOAD DATA INPATH 'gs://dataproc-staging-us-central1-289782612369-042x4b1s/combined.csv' INTO TABLE sudnya007;
+
+#Task Queries 
+1. The top 10 posts by score 
+ SELECT Postid, Postscript, PostScore from sudnyaview007 ORDER BY PostScoress DESC LIMIT 10;
+ 
+2. The top 10 users by post score 
+  SELECT Userid,UserName,sum(PostScores) as PostScores from sudnyaview007 GROUP BY Userid,UserName ORDER BY PostScores DESC LIMIT 10;
+  
+3.The number of distinct users, who used the word “cloud” in one of their posts
+  SELECT COUNT(DISTINCT UserId) as TotalDistinctUsers FROM sudnyaview007 WHERE Postscript LIKE '% cloud %' OR Stuc LIKE '% cloud %';
+
+4. Calculate the per-user TF-IDF of the top 10 terms for each of the top 10 users 
+	from pyhive import hive  #Installed necessary packages and libraries
+from tabulate import tabulate
+import pandas as pd
+
+#Establishing a connection with Hive
+conn = hive.Connection(host='localhost',port=10000,username='sudnya_mali2',password='2589089972390042567',database='default',auth='CUSTOM')
+cur = conn.cursor()
+df = pd.read_sql('''
+SELECT UserId,UserName,Postscript,Stuc
+from sudnyaview007
+WHERE UserId
+IN
+(
+select UserId from(select UserId,max(UserName),sum(postscores) as scores
+from sudnyaview07
+group by UserId
+order by scores desc limit 10)stack
+)
+order by UserId''', conn)
+display(df)
+
+df["text"] = df["postscript"] + df["stuc"]
+top_10_username = list(df["username"].unique())
+top_10_username
+
+#Calculating TF-IDF
+from sklearn.feature_extraction.text import TfidfVectorizer
+# Calculate sum() of TF-IDF and get top 10 words with highest TF-IDF and select only those columns
+# Calculate sum() of TF-IDF and get top 10 words with highest TF-IDF and select only those columns
+def tf_idf(df):
+    vectorizer = TfidfVectorizer(stop_words='english', lowercase=True) # Remove Stop Words
+    response = vectorizer.fit_transform(df["text"]) # Use title field for TF/IDF
+    df_tfidf_sklearn = pd.DataFrame(response.toarray(),columns=vectorizer.get_feature_names())
+    total_tf_idf = df_tfidf_sklearn.sum(axis = 0) # Remove sum of TF/IDF for getting top 10 most used words
+    top_10_list = total_tf_idf.nlargest(10) # Get top 10 words per user
+    top_10_words = list(top_10_list.index) # Get list of top 10 words
+    df_tfidf_sklearn[top_10_words] # Select only top 10 words as column
+    return df_tfidf_sklearn[top_10_words]
+
+for each_user in top_10_username: 
+    username_id = str(each_user)
+    filtered_data = df[(s_df['username']==username_id)] # Filter data only for selected user
+    tf_idf_df = tf_idf(filtered_data) # pass on to above function
+    print("For Username ID TF/IDF table : "+username_id)
+    tf_idf_df.insert(0, 'usernameid', username_id)# attach username ID field to dataframe
+    display(tf_idf_df)
+    print("******************************************************************************\n\n\n")
